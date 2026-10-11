@@ -20,7 +20,7 @@ SpendLog Mobile is designed with mobile-first principles and strict clean archit
 ## 🛠 Tech Stack
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | **Framework** | Flutter (Stable channel) |
 | **Language** | Dart |
 | **State Management** | Flutter Riverpod |
@@ -60,22 +60,26 @@ SQLite Database (`spendlog.db`)
 ### Setup & Run
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/<your-username>/spendlog_mobile.git
    cd spendlog_mobile
    ```
 
 2. **Install Flutter packages:**
+
    ```bash
    flutter pub get
    ```
 
 3. **Generate Drift database code:**
+
    ```bash
    dart run build_runner build --delete-conflicting-outputs
    ```
 
 4. **Run the app:**
+
    ```bash
    flutter run
    ```
