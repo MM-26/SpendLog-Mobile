@@ -1,120 +1,175 @@
 # SpendLog Mobile
 
-A sleek, lightweight, offline-first personal expense tracker built with Flutter.
+A standalone, offline-first mobile expense tracker built using Flutter, Drift ORM, and SQLite.
 
-SpendLog Mobile is designed with mobile-first principles and strict clean architecture, ensuring total privacy, fast performance, and a delightful user experience with zero external dependencies.
+## Overview
 
----
+SpendLog Mobile is a mobile application designed to help users track personal expenses with simplicity, speed, and complete privacy. All financial data is stored locally on the device with zero cloud tracking, third-party accounts, or internet connectivity required.
 
-## ✨ Features
+Built with mobile-first principles and Clean Architecture, the application features an intuitive Material 3 user interface with dynamic theme switching, monthly aggregations, categorized expenses, and high-performance local SQLite querying.
 
-- 🔒 **100% Offline & Private** — All data remains strictly on your device using a local SQLite database powered by Drift ORM. No internet access, account creation, or cloud tracking required.
-- 📐 **Clean Architecture** — Top-down unidirectional data flow: UI Widgets &rarr; Riverpod Providers &rarr; Repository Layer &rarr; Local Data Source.
-- 🎨 **Modern Material 3 Design** — Thoughtfully crafted UI with smooth transitions, custom hero summary cards, dynamic category badges, and instant Light/Dark theme switching.
-- 📅 **Smart Monthly Tracking** — Expenses are automatically grouped by month with real-time totals, category breakdowns, and detailed monthly views.
-- ⚡ **Optimized Performance** — Indexed database queries for instant searches and smooth 60 FPS scrolling even with extensive transaction histories.
-- 🏷️ **Core Categories** — Pre-configured with 6 essential spending categories: Food, Transport, Utilities, Entertainment, Health, and Shopping.
+## Features
 
----
+* Add, edit, and delete daily expenses
+* 6 spending categories (Food, Transport, Utilities, Entertainment, Health, Shopping)
+* Real-time monthly spending summaries with visual totals
+* Historical monthly archives with detailed transaction lists
+* Date picker with sensible boundary validation
+* 100% offline-first architecture with on-device SQLite storage
+* Instant Light and Dark mode switching with persistent preferences
+* Optimized indexed queries for fast startup and smooth 60 FPS scrolling
+* Modern Material 3 mobile UI with custom category badges and hero summary cards
 
-## 🛠 Tech Stack
+## Tech Stack
 
-| Layer | Technology |
-| --- | --- |
-| **Framework** | Flutter (Stable channel) |
-| **Language** | Dart |
-| **State Management** | Flutter Riverpod |
-| **Database ORM** | Drift |
-| **Database Engine** | SQLite (via `sqlite3_flutter_libs`) |
-| **Platform Target** | Android |
-| **Typography & Formatting** | `intl` |
+### Frontend & UI
 
----
+* **Flutter** (Channel stable)
+* **Material Design 3**
+* **intl** (Currency and date formatting)
 
-## 🏗 Architecture Overview
+### State Management & Architecture
 
-The app enforces strict layer isolation. UI components never communicate directly with the database or ORM types:
+* **Flutter Riverpod** (Declarative state management & dependency injection)
+* **Clean Architecture** (Separation of UI, Providers, Domain Repositories, and Data Sources)
 
+### Database & Persistence
+
+* **Drift ORM** (Type-safe, reactive SQL client for Dart)
+* **SQLite** (via `sqlite3_flutter_libs`)
+* **shared_preferences** (Theme preference persistence)
+
+## Project Structure
+
+```text
+spendlog_mobile/
+├── android/                             # Android native host project & build configurations
+├── assets/                              # App assets & launcher icons
+│   └── icons/
+├── ios/                                 # iOS native project structure
+├── lib/
+│   ├── core/
+│   │   ├── database/                    # Drift SQLite database definition & tables
+│   │   │   ├── tables/
+│   │   │   │   └── expenses.dart
+│   │   │   ├── app_database.dart
+│   │   │   └── app_database.g.dart
+│   │   ├── theme/                       # Material 3 light & dark theme definitions
+│   │   │   └── app_theme.dart
+│   │   └── utils/                       # Currency and date utility formatters
+│   │       ├── currency_formatter.dart
+│   │       └── date_formatter.dart
+│   ├── data_sources/                    # Local data persistence
+│   │   └── local/
+│   │       └── expense_local_data_source.dart
+│   ├── models/                          # Domain models (Expense, MonthSummary)
+│   │   ├── expense.dart
+│   │   └── month_summary.dart
+│   ├── providers/                       # Riverpod state notifiers & providers
+│   │   ├── expense_provider.dart
+│   │   └── theme_provider.dart
+│   ├── repositories/                    # Domain repositories (Business logic layer)
+│   │   └── expense_repository.dart
+│   ├── screens/                         # Application screens & navigation shell
+│   │   ├── add_expense/
+│   │   │   └── add_expense_screen.dart
+│   │   ├── history/
+│   │   │   └── history_screen.dart
+│   │   ├── home/
+│   │   │   └── home_screen.dart
+│   │   ├── month_detail/
+│   │   │   └── month_detail_screen.dart
+│   │   ├── settings/
+│   │   │   └── settings_screen.dart
+│   │   └── main_navigation_shell.dart
+│   ├── widgets/                         # Reusable UI widgets
+│   │   ├── category_badge.dart
+│   │   ├── expense_list_tile.dart
+│   │   └── hero_total_card.dart
+│   ├── app.dart                         # Root MaterialApp configuration
+│   └── main.dart                        # Application entrypoint
+├── test/                                # Unit, repository, performance & widget test suite
+├── pubspec.yaml                         # Project dependencies & assets configuration
+└── README.md
 ```
+
+## Architecture
+
+The project enforces strict layer isolation. UI components never interact directly with Drift or SQLite database types:
+
+```text
 UI Layer (Screens & Widgets)
-          ↓ (watches / calls)
+          ↓ (watches / invokes)
 State Management (Riverpod Providers)
-          ↓ (interacts with)
-Repository Layer (Domain logic & plain Dart models)
           ↓ (calls)
-Local Data Source (Drift queries & schema mappings)
-          ↓ (persists to)
+Repository Layer (Domain logic & plain Dart models)
+          ↓ (queries)
+Local Data Source (Drift queries & entity mappings)
+          ↓ (persists)
 SQLite Database (`spendlog.db`)
 ```
 
----
-
-## 🚀 Getting Started
+## Running the Project
 
 ### Prerequisites
 
-- [Flutter SDK](https://flutter.dev/docs/get-started/install) (v3.24+ recommended)
-- Java 17 or Java 21 LTS
-- Android SDK with platform tools (or a connected physical Android device / emulator)
+* Flutter SDK (3.24+ recommended)
+* Java 17 or Java 21 LTS
+* Android Studio / Android SDK (or a connected Android device / emulator)
 
 ### Setup & Run
 
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/<your-username>/spendlog_mobile.git
-   cd spendlog_mobile
-   ```
-
-2. **Install Flutter packages:**
-
+1. **Install dependencies**:
    ```bash
    flutter pub get
    ```
 
-3. **Generate Drift database code:**
-
+2. **Generate Drift code**:
    ```bash
    dart run build_runner build --delete-conflicting-outputs
    ```
 
-4. **Run the app:**
-
+3. **Run on connected device/emulator**:
    ```bash
    flutter run
    ```
 
----
+### Running Tests
 
-## 🧪 Testing & Code Quality
-
-Run the automated test suite (including unit tests, repository tests, validation checks, and UI shell integration tests):
+Execute the automated test suite covering data source, repository, state providers, and UI integration:
 
 ```bash
 flutter test
 ```
 
-Run static code analysis:
+Execute static analysis:
 
 ```bash
 flutter analyze
 ```
 
----
+### Building Release APK
 
-## 📦 Building Production Release
-
-To generate lightweight, architecture-optimized release APKs:
+Build lightweight architecture-specific release APKs:
 
 ```bash
 flutter build apk --release --split-per-abi
 ```
 
-The split APKs will be output to:
-`build/app/outputs/flutter-apk/` (e.g. `app-arm64-v8a-release.apk` for modern Android devices).
+Generated APKs will be located in:
+`build/app/outputs/flutter-apk/`
 
----
+## Future Enhancements
 
-## 📄 License
+* Custom budget limits per category
+* Search and transaction filtering
+* Spending visual charts and analytics
+* CSV / JSON data backup and export
+* Biometric authentication lock
+* Optional cloud synchronization with desktop SpendLog
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## Current Status
+
+Version 1.0.0 completed.
+
+Implemented features include offline SQLite persistence with Drift ORM, full CRUD operations for expenses, automated monthly archiving and summary calculations, category tagging, dynamic light/dark theming, 46/46 passing automated tests, release keystore signing, and architecture-split production APKs.
