@@ -23,62 +23,7 @@ class MonthDetailScreen extends ConsumerWidget {
     required this.count,
   });
 
-  void _showDeleteDialog(BuildContext context, WidgetRef ref, ExpenseModel expense) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Row(
-          children: [
-            Icon(Icons.delete_outline_rounded, color: AppColors.error),
-            SizedBox(width: 8),
-            Text('Delete Expense'),
-          ],
-        ),
-        content: Text('Are you sure you want to delete "${expense.description}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              try {
-                await ref.read(expenseActionsProvider).deleteExpense(expense.id);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Deleted "${expense.description}"'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error deleting: $e'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleEdit(BuildContext context, ExpenseModel expense) {
+  void _handleEdit(BuildContext context, WidgetRef ref, ExpenseModel expense) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => AddExpenseScreen(
@@ -91,7 +36,9 @@ class MonthDetailScreen extends ConsumerWidget {
           initialCategory: expense.category,
           initialDate: expense.expenseDate,
           initialNotes: expense.notes,
+          initialType: expense.type,
           initialCreatedAt: expense.createdAt,
+          onDeletePressed: () => ref.read(expenseActionsProvider).deleteExpense(expense.id),
         ),
       ),
     );
@@ -120,9 +67,6 @@ class MonthDetailScreen extends ConsumerWidget {
     final chipBg = isDark ? const Color(0xFF252837) : const Color(0xFFF1F3F9);
 
     final monthExpensesAsync = ref.watch(monthExpensesProvider((year: year, month: month)));
-    final monthTotalAsync = ref.watch(monthTotalProvider((year: year, month: month)));
-
-    final currentTotal = monthTotalAsync.value ?? total;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -248,16 +192,31 @@ class MonthDetailScreen extends ConsumerWidget {
           ),
         ),
         data: (expenses) {
+          double incomeTotal = 0.0;
+          double spentTotal = 0.0;
+          for (final exp in expenses) {
+            if (exp.isIncome) {
+              incomeTotal += exp.amount;
+            } else {
+              spentTotal += exp.amount;
+            }
+          }
+          final netBalance = incomeTotal - spentTotal;
+
           return SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Hero Month Total Card
+                // Hero Month Total Card (3-in-1 layout)
                 HeroTotalCard(
-                  title: 'Total for $monthTitle',
-                  amount: currentTotal,
-                  subtitle: '${expenses.length} ${expenses.length == 1 ? "expense" : "expenses"} in this archive',
+                  title: incomeTotal > 0
+                      ? '$monthTitle Balance'
+                      : 'Total for $monthTitle',
+                  amount: incomeTotal > 0 ? netBalance : spentTotal,
+                  incomeAmount: incomeTotal,
+                  spentAmount: spentTotal,
+                  subtitle: '${expenses.length} ${expenses.length == 1 ? "entry" : "entries"} in this archive',
                   icon: Icons.calendar_today_rounded,
                 ),
 
@@ -371,9 +330,8 @@ class MonthDetailScreen extends ConsumerWidget {
                         category: item.category,
                         expenseDate: item.expenseDate,
                         notes: item.notes,
-                        onEdit: () => _handleEdit(context, item),
-                        onDelete: () => _showDeleteDialog(context, ref, item),
-                        onTap: () => _handleEdit(context, item),
+                        type: item.type,
+                        onTap: () => _handleEdit(context, ref, item),
                       );
                     },
                   ),

@@ -25,6 +25,7 @@ class ExpenseLocalDataSource {
       category: expense.category,
       expenseDate: expense.expenseDate,
       notes: expense.notes,
+      type: expense.type,
       createdAt: expense.createdAt,
       updatedAt: expense.updatedAt,
     );
@@ -43,6 +44,7 @@ class ExpenseLocalDataSource {
       category: expense.category,
       expenseDate: expense.expenseDate,
       notes: Value(expense.notes),
+      type: Value(expense.type),
       createdAt: Value(now),
       updatedAt: Value(now),
     );
@@ -61,6 +63,7 @@ class ExpenseLocalDataSource {
       category: Value(expense.category),
       expenseDate: Value(expense.expenseDate),
       notes: Value(expense.notes),
+      type: Value(expense.type),
       updatedAt: Value(DateTime.now()),
       // createdAt intentionally absent — Drift treats absent fields as no-op
     );
@@ -103,6 +106,20 @@ class ExpenseLocalDataSource {
         .go();
   }
 
+  /// Atomically replaces all existing expenses with [newExpenses] inside a
+  /// single database transaction (Bible v1.1 Decision 10).
+  ///
+  /// If any operation fails, the transaction rolls back completely,
+  /// preserving existing records untouched.
+  Future<void> replaceAllExpenses(List<ExpenseModel> newExpenses) async {
+    await database.transaction(() async {
+      await database.delete(database.expenses).go();
+      for (final expense in newExpenses) {
+        await database.into(database.expenses).insert(_toInsertCompanion(expense));
+      }
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Queries
   // ---------------------------------------------------------------------------
@@ -126,18 +143,22 @@ class ExpenseLocalDataSource {
     return rows.map(_toModel).toList();
   }
 
-  /// Returns all months that have at least one expense, as a list of
-  /// [MonthSummary] objects sorted newest-first.
+  /// Returns every month from the oldest expense up to the current month,
+  /// newest-first, including months with zero expenses.
   ///
-  /// Grouping and total calculation happens in Dart after fetching all rows.
-  /// This keeps the query simple and lets the index on [expenseDate] do
-  /// the heavy lifting on ordering.
+  /// This ensures past months without any expenses are still visible in
+  /// History so the user can tap in and log retroactive entries.
+  /// If there are no expenses at all the list is empty (home screen handles
+  /// the brand-new user state).
   Future<List<MonthSummary>> getExpensesGroupedByMonth() async {
     final rows = await (database.select(database.expenses)
-          ..orderBy([(t) => OrderingTerm.desc(t.expenseDate)]))
+          ..orderBy([(t) => OrderingTerm.asc(t.expenseDate)]))
         .get();
 
-    // Group rows by year+month key
+    // If there are no expenses at all, return empty — no anchor to start from.
+    if (rows.isEmpty) return [];
+
+    // Build a map of year+month → expenses for quick lookup.
     final Map<String, List<Expense>> grouped = {};
     for (final row in rows) {
       final key =
@@ -145,18 +166,58 @@ class ExpenseLocalDataSource {
       grouped.putIfAbsent(key, () => []).add(row);
     }
 
-    // Build sorted MonthSummary list (keys are already in desc order because
-    // rows were fetched desc and Map preserves insertion order in Dart)
-    return grouped.entries.map((entry) {
-      final expenses = entry.value.map(_toModel).toList();
-      final total = expenses.fold(0.0, (sum, e) => sum + e.amount);
-      return MonthSummary(
-        year: expenses.first.expenseDate.year,
-        month: expenses.first.expenseDate.month,
-        total: total,
+    // Determine the range: oldest expense month → max(newest expense, current month).
+    final oldest = rows.first.expenseDate;
+    final newest = rows.last.expenseDate;
+    final now = DateTime.now();
+    int walkYear = oldest.year;
+    int walkMonth = oldest.month;
+    
+    final bool newestIsFuture = newest.year > now.year || 
+        (newest.year == now.year && newest.month > now.month);
+    final endYear = newestIsFuture ? newest.year : now.year;
+    final endMonth = newestIsFuture ? newest.month : now.month;
+
+    final List<MonthSummary> result = [];
+
+    // Walk every calendar month in the range (inclusive on both ends).
+    while (walkYear < endYear || (walkYear == endYear && walkMonth <= endMonth)) {
+      final key = '$walkYear-${walkMonth.toString().padLeft(2, '0')}';
+      final monthRows = grouped[key] ?? [];
+
+      final expenses = monthRows.map(_toModel).toList();
+      double totalIncome = 0.0;
+      double totalExpense = 0.0;
+      for (final exp in expenses) {
+        if (exp.isIncome) {
+          totalIncome += exp.amount;
+        } else {
+          totalExpense += exp.amount;
+        }
+      }
+      final netBalance = totalIncome - totalExpense;
+
+      result.add(MonthSummary(
+        year: walkYear,
+        month: walkMonth,
+        total: totalExpense,
+        totalIncome: totalIncome,
+        totalExpense: totalExpense,
+        netBalance: netBalance,
         expenses: expenses,
-      );
-    }).toList();
+      ));
+
+      // Advance one month.
+      if (walkMonth == 12) {
+        walkYear += 1;
+        walkMonth = 1;
+      } else {
+        walkMonth += 1;
+      }
+    }
+
+    // Return newest-first.
+    return result.reversed.toList();
   }
 
   // ---------------------------------------------------------------------------

@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_theme.dart';
 import '../core/utils/currency_formatter.dart';
 import '../core/utils/date_formatter.dart';
 import 'category_badge.dart';
 
 /// Expense card — fully theme-aware (light & dark).
+///
+/// Tapping the tile opens Edit Expense. Delete has moved to the Edit Expense
+/// screen's AppBar (v1.1 Decision 10, step 1) — the 3-dot menu is removed.
+/// Amounts use GPay-style colors: neutral for expenses, green with '+' for income.
 class ExpenseListTile extends StatelessWidget {
   final String description;
   final double amount;
   final String category;
   final DateTime expenseDate;
   final String? notes;
+  final String type; // 'expense' or 'income' (Bible v1.16 Decision 10)
   final VoidCallback? onTap;
+  // onEdit and onDelete are kept so callers don't need to change, but the
+  // 3-dot popup menu is removed from the tile UI per v1.1 Decision 10.
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
@@ -21,6 +29,7 @@ class ExpenseListTile extends StatelessWidget {
     required this.category,
     required this.expenseDate,
     this.notes,
+    this.type = 'expense',
     this.onTap,
     this.onEdit,
     this.onDelete,
@@ -104,52 +113,21 @@ class ExpenseListTile extends StatelessWidget {
                   ),
                 ),
 
-                // Amount
+                // Amount (GPay-style per Bible v1.16 Decision 10)
                 Text(
-                  CurrencyFormatter.format(amount),
-                  style: const TextStyle(
+                  type == 'income'
+                      ? '+${CurrencyFormatter.format(amount)}'
+                      : CurrencyFormatter.format(amount),
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF059669),
+                    color: type == 'income' ? AppColors.creditGreen : textPrimary,
                     letterSpacing: -0.3,
                   ),
                 ),
 
-                // Popup menu for Edit / Delete
-                if (onEdit != null || onDelete != null)
-                  PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert_rounded, color: textMuted, size: 20),
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    onSelected: (value) {
-                      if (value == 'edit' && onEdit != null) onEdit!();
-                      if (value == 'delete' && onDelete != null) onDelete!();
-                    },
-                    itemBuilder: (context) => [
-                      if (onEdit != null)
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit_rounded, size: 18, color: Color(0xFF635BFF)),
-                              SizedBox(width: 10),
-                              Text('Edit'),
-                            ],
-                          ),
-                        ),
-                      if (onDelete != null)
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
-                              SizedBox(width: 10),
-                              Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
+                // v1.1 Decision 10: 3-dot popup menu removed.
+                // Delete has moved to the Edit Expense screen's AppBar.
               ],
             ),
           ),

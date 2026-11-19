@@ -12,62 +12,7 @@ import '../add_expense/add_expense_screen.dart';
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  void _showDeleteDialog(BuildContext context, WidgetRef ref, ExpenseModel expense) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Row(
-          children: [
-            Icon(Icons.delete_outline_rounded, color: AppColors.error),
-            SizedBox(width: 8),
-            Text('Delete Expense'),
-          ],
-        ),
-        content: Text('Are you sure you want to delete "${expense.description}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              try {
-                await ref.read(expenseActionsProvider).deleteExpense(expense.id);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Deleted "${expense.description}"'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error deleting: $e'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleEdit(BuildContext context, ExpenseModel expense) {
+  void _handleEdit(BuildContext context, WidgetRef ref, ExpenseModel expense) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => AddExpenseScreen(
@@ -78,7 +23,9 @@ class HomeScreen extends ConsumerWidget {
           initialCategory: expense.category,
           initialDate: expense.expenseDate,
           initialNotes: expense.notes,
+          initialType: expense.type,
           initialCreatedAt: expense.createdAt,
+          onDeletePressed: () => ref.read(expenseActionsProvider).deleteExpense(expense.id),
         ),
       ),
     );
@@ -95,9 +42,13 @@ class HomeScreen extends ConsumerWidget {
     final chipBg = isDark ? const Color(0xFF252837) : const Color(0xFFF1F3F9);
 
     final expensesAsync = ref.watch(currentMonthExpensesProvider);
-    final totalAsync = ref.watch(currentMonthTotalProvider);
+    final spentAsync = ref.watch(currentMonthTotalProvider);
+    final incomeAsync = ref.watch(currentMonthIncomeTotalProvider);
+    final netAsync = ref.watch(currentMonthNetBalanceProvider);
 
-    final currentMonthTotal = totalAsync.value ?? 0.0;
+    final currentMonthSpent = spentAsync.value ?? 0.0;
+    final currentMonthIncome = incomeAsync.value ?? 0.0;
+    final currentMonthNet = netAsync.value ?? (currentMonthIncome - currentMonthSpent);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -231,11 +182,15 @@ class HomeScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Hero Total Card
+                // Hero Total Card (3-in-1 layout)
                 HeroTotalCard(
-                  title: 'Total for ${DateFormatter.formatMonthYear(now)}',
-                  amount: currentMonthTotal,
-                  subtitle: '${expenses.length} ${expenses.length == 1 ? "expense" : "expenses"} logged this month',
+                  title: currentMonthIncome > 0
+                      ? '${DateFormatter.formatMonthYear(now)} Balance'
+                      : 'Total for ${DateFormatter.formatMonthYear(now)}',
+                  amount: currentMonthIncome > 0 ? currentMonthNet : currentMonthSpent,
+                  incomeAmount: currentMonthIncome,
+                  spentAmount: currentMonthSpent,
+                  subtitle: '${expenses.length} ${expenses.length == 1 ? "entry" : "entries"} logged this month',
                   icon: Icons.trending_up_rounded,
                 ),
 
@@ -355,9 +310,8 @@ class HomeScreen extends ConsumerWidget {
                         category: item.category,
                         expenseDate: item.expenseDate,
                         notes: item.notes,
-                        onEdit: () => _handleEdit(context, item),
-                        onDelete: () => _showDeleteDialog(context, ref, item),
-                        onTap: () => _handleEdit(context, item),
+                        type: item.type,
+                        onTap: () => _handleEdit(context, ref, item),
                       );
                     },
                   ),

@@ -27,6 +27,7 @@ class AppColors {
 
   // Functional & Semantic Colors
   static const Color amountGreen = Color(0xFF059669);
+  static const Color creditGreen = Color(0xFF1E8E3E); // GPay-style credit green (Bible v1.16 Decision 10)
   static const Color error = Color(0xFFEF4444);
   static const Color warning = Color(0xFFF59E0B);
   static const Color info = Color(0xFF3B82F6);
@@ -62,6 +63,17 @@ class AppColors {
       color: Color(0xFFD97706),
       backgroundColor: Color(0xFFFFFBEB),
       icon: Icons.edit_rounded,
+    ),
+    // Income Categories (Bible v1.16 Decision 10)
+    'Salary': CategoryStyle(
+      color: Color(0xFF1E8E3E),
+      backgroundColor: Color(0xFFE6F4EA),
+      icon: Icons.payments_rounded,
+    ),
+    'Allowance': CategoryStyle(
+      color: Color(0xFF0D9488),
+      backgroundColor: Color(0xFFCCFBF1),
+      icon: Icons.savings_rounded,
     ),
     'Other': CategoryStyle(
       color: Color(0xFF8B5CF6),

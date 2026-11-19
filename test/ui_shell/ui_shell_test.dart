@@ -14,6 +14,7 @@ import 'package:spendlog_mobile/screens/history/history_screen.dart';
 import 'package:spendlog_mobile/screens/home/home_screen.dart';
 import 'package:spendlog_mobile/screens/month_detail/month_detail_screen.dart';
 import 'package:spendlog_mobile/screens/settings/settings_screen.dart';
+import 'package:spendlog_mobile/widgets/expense_list_tile.dart';
 import 'package:spendlog_mobile/widgets/hero_total_card.dart';
 
 Future<Widget> _createTestApp({List<ExpenseModel> seedExpenses = const []}) async {
@@ -140,6 +141,45 @@ void main() {
       expect(find.byIcon(Icons.add_rounded), findsOneWidget);
     });
 
+    testWidgets('Horizontal swipe between Home, History, and Settings functions and hides/shows FAB properly (v1.1 Decision 10)', (tester) async {
+      final app = await _createTestApp(seedExpenses: sampleExpenses);
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      // On Home tab initially: FAB is visible
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+
+      // Swipe left from Home -> History
+      await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HistoryScreen), findsOneWidget);
+      expect(find.text('Monthly History'), findsOneWidget);
+      expect(find.byIcon(Icons.add_rounded), findsNothing);
+
+      // Swipe left from History -> Settings
+      await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(find.byIcon(Icons.add_rounded), findsNothing);
+
+      // Swipe right from Settings -> History
+      await tester.fling(find.byType(PageView), const Offset(400, 0), 1000);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HistoryScreen), findsOneWidget);
+      expect(find.byIcon(Icons.add_rounded), findsNothing);
+
+      // Swipe right from History -> Home
+      await tester.fling(find.byType(PageView), const Offset(400, 0), 1000);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+    });
+
     testWidgets('Tapping month card in History navigates to MonthDetailScreen with bottom-right FAB', (tester) async {
       final app = await _createTestApp(seedExpenses: sampleExpenses);
       await tester.pumpWidget(app);
@@ -149,9 +189,18 @@ void main() {
       await tester.tap(find.byIcon(Icons.calendar_month_outlined));
       await tester.pumpAndSettle();
 
-      // June 2025 card should appear from SQLite
-      expect(find.text('June 2025'), findsOneWidget);
-      await tester.tap(find.text('June 2025'));
+      // June 2025 card should appear from SQLite (scroll until visible in continuous list)
+      final juneFinder = find.text('June 2025');
+      await tester.scrollUntilVisible(
+        juneFinder,
+        500,
+        scrollable: find.descendant(
+          of: find.byType(HistoryScreen),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(juneFinder, findsOneWidget);
+      await tester.tap(juneFinder);
       await tester.pumpAndSettle();
 
       // Verify MonthDetailScreen displays live SQLite records
@@ -247,25 +296,29 @@ void main() {
       expect(find.text('Restricted to June 2025'), findsOneWidget);
     });
 
-    testWidgets('ExpenseListTile supports Edit and Delete actions live with database', (tester) async {
+    testWidgets('Tapping ExpenseListTile opens Edit, which supports Delete in AppBar (v1.1)', (tester) async {
       final app = await _createTestApp(seedExpenses: sampleExpenses);
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
 
-      // Find options menu on first expense
-      final optionsButtons = find.byIcon(Icons.more_vert_rounded);
-      expect(optionsButtons, findsWidgets);
+      // Find first expense tile and tap it to open Edit Expense
+      final firstTile = find.byType(ExpenseListTile).first;
+      expect(firstTile, findsOneWidget);
 
-      // Tap 3-dots on first item
-      await tester.tap(optionsButtons.first);
+      await tester.tap(firstTile);
       await tester.pumpAndSettle();
 
-      // Verify Edit and Delete menu items exist
-      expect(find.text('Edit'), findsOneWidget);
-      expect(find.text('Delete'), findsOneWidget);
+      // Verify we are on Edit Expense screen
+      expect(find.byType(AddExpenseScreen), findsOneWidget);
+      expect(find.text('Edit Expense'), findsOneWidget);
+      expect(find.text('Update Expense'), findsOneWidget);
 
-      // Tap Delete to open confirmation dialog
-      await tester.tap(find.text('Delete'));
+      // Verify Delete icon button in AppBar
+      final deleteBtn = find.byTooltip('Delete expense');
+      expect(deleteBtn, findsOneWidget);
+
+      // Tap Delete icon to open confirmation dialog
+      await tester.tap(deleteBtn);
       await tester.pumpAndSettle();
 
       expect(find.text('Delete Expense'), findsOneWidget);
@@ -276,15 +329,8 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
 
-      // Re-open menu to test Edit
-      await tester.tap(optionsButtons.first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Edit'));
-      await tester.pumpAndSettle();
-
+      // Still on Edit Expense screen
       expect(find.byType(AddExpenseScreen), findsOneWidget);
-      expect(find.text('Edit Expense'), findsOneWidget);
-      expect(find.text('Update Expense'), findsOneWidget);
     });
   });
 }

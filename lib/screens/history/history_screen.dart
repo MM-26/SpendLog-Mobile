@@ -254,7 +254,9 @@ class HistoryScreen extends ConsumerWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${item.expenses.length} ${item.expenses.length == 1 ? "expense" : "expenses"} logged',
+                                  item.expenses.isEmpty
+                                      ? 'No entries logged'
+                                      : '${item.expenses.length} ${item.expenses.length == 1 ? "entry" : "entries"} logged',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
@@ -270,11 +272,17 @@ class HistoryScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                CurrencyFormatter.format(item.total),
-                                style: const TextStyle(
+                                item.totalIncome > 0
+                                    ? (item.netBalance >= 0
+                                        ? '+${CurrencyFormatter.format(item.netBalance)}'
+                                        : CurrencyFormatter.format(item.netBalance))
+                                    : CurrencyFormatter.format(item.totalExpense),
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFF059669),
+                                  color: (item.totalIncome > 0 && item.netBalance > 0)
+                                      ? AppColors.creditGreen
+                                      : (item.expenses.isEmpty ? textSecondary : textPrimary),
                                   letterSpacing: -0.3,
                                 ),
                               ),

@@ -246,19 +246,19 @@ void main() {
           _model(amount: 50.0, expenseDate: DateTime(2026, 7, 10)));
 
       final groups = await ds.getExpensesGroupedByMonth();
-      expect(groups, hasLength(2));
+      // Continuous timeline from oldest (July 2026) to current month
+      expect(groups.first.year, DateTime.now().year);
+      expect(groups.first.month, DateTime.now().month);
+      expect(groups.last.year, 2026);
+      expect(groups.last.month, 7);
 
-      // First group should be August (newest)
-      expect(groups[0].year, 2026);
-      expect(groups[0].month, 8);
-      expect(groups[0].total, closeTo(30.0, 0.001));
-      expect(groups[0].expenses, hasLength(2));
+      final aug = groups.firstWhere((g) => g.year == 2026 && g.month == 8);
+      expect(aug.total, closeTo(30.0, 0.001));
+      expect(aug.expenses, hasLength(2));
 
-      // Second group should be July
-      expect(groups[1].year, 2026);
-      expect(groups[1].month, 7);
-      expect(groups[1].total, closeTo(50.0, 0.001));
-      expect(groups[1].expenses, hasLength(1));
+      final jul = groups.firstWhere((g) => g.year == 2026 && g.month == 7);
+      expect(jul.total, closeTo(50.0, 0.001));
+      expect(jul.expenses, hasLength(1));
     });
 
     test('getExpensesGroupedByMonth returns empty list when no expenses',

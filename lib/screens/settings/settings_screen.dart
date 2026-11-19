@@ -1,10 +1,243 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/utils/backup_service.dart';
+import '../../providers/expense_provider.dart';
 import '../../providers/theme_provider.dart';
 
 /// Settings and App Information screen.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
+
+  Future<void> _handleExport(BuildContext context, WidgetRef ref) async {
+    try {
+      final result = await ref.read(expenseActionsProvider).exportBackup();
+      if (!context.mounted || result == null) return; // User cancelled
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Color(0xFF10B981)),
+              SizedBox(width: 8),
+              Text('Export Successful'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Saved ${result.count} ${result.count == 1 ? "expense" : "expenses"} to:',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx).brightness == Brightness.dark
+                      ? const Color(0xFF151824)
+                      : const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: SelectableText(
+                  result.filePath,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: AppColors.error),
+              SizedBox(width: 8),
+              Text('Export Failed'),
+            ],
+          ),
+          content: Text('Could not export backup: $e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleImport(BuildContext context, WidgetRef ref) async {
+    // 1. Prompt user to pick file and strictly validate BEFORE modifying anything
+    BackupValidationResult? validation;
+    try {
+      validation = await ref.read(expenseActionsProvider).pickAndValidateBackup();
+      if (!context.mounted || validation == null) return; // User cancelled file picker
+    } on BackupException catch (e) {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: AppColors.error),
+              SizedBox(width: 8),
+              Text('Invalid Backup File'),
+            ],
+          ),
+          content: Text(e.message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    } catch (e) {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: AppColors.error),
+              SizedBox(width: 8),
+              Text('Import Error'),
+            ],
+          ),
+          content: Text('Failed to read selected file: $e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // 2. Fetch current expense count for confirmation dialog
+    final currentExpenses = await ref.read(expenseRepositoryProvider).getAllExpenses();
+
+    if (!context.mounted) return;
+
+    // 3. Confirmation Dialog per Bible §3 Decision 10
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
+            SizedBox(width: 8),
+            Text('Restore Backup?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (validation!.fileName != null) ...[
+              Text(
+                'File: ${validation.fileName}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const SizedBox(height: 10),
+            ],
+            const Text(
+              'Importing this backup will completely replace all existing data in SpendLog.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 14),
+            Text('• Existing expenses to be erased: ${currentExpenses.length}'),
+            const SizedBox(height: 4),
+            Text('• Expenses to be loaded: ${validation.expenses.length}'),
+            const SizedBox(height: 4),
+            Text('• Backup version: v${validation.version}'),
+            const SizedBox(height: 14),
+            const Text(
+              'This action cannot be undone.',
+              style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Replace All & Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // 4. Perform atomic single-transaction restore
+    try {
+      await ref.read(expenseActionsProvider).restoreBackup(validation.expenses);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Successfully restored ${validation.expenses.length} expenses'),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: AppColors.error),
+              SizedBox(width: 8),
+              Text('Restore Failed'),
+            ],
+          ),
+          content: Text('Failed to restore backup: $e\nExisting records were not modified.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -74,19 +307,12 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: 'Save expenses to backup file',
                   textPrimary: textPrimary,
                   textSecondary: textSecondary,
-                  trailing: _VersionBadge(
-                    label: 'V1.1',
-                    color: const Color(0xFF6366F1),
-                    bgColor: isDark ? const Color(0xFF1E2040) : const Color(0xFFEEF2FF),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: Color(0xFF9AA5C4),
                   ),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Export feature will be available in V1.1'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
+                  onTap: () => _handleExport(context, ref),
                 ),
                 Divider(height: 1, color: dividerColor),
                 _SettingsTile(
@@ -97,19 +323,12 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: 'Restore expenses from backup file',
                   textPrimary: textPrimary,
                   textSecondary: textSecondary,
-                  trailing: _VersionBadge(
-                    label: 'V1.1',
-                    color: const Color(0xFF0EA5E9),
-                    bgColor: isDark ? const Color(0xFF0D2233) : const Color(0xFFF0F9FF),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: Color(0xFF9AA5C4),
                   ),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Import feature will be available in V1.1'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
+                  onTap: () => _handleImport(context, ref),
                 ),
               ],
             ),
@@ -230,7 +449,7 @@ class _BrandCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Version 1.0.0 • Offline',
+                  'Version 2.0.0 • Offline',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -429,33 +648,3 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
-class _VersionBadge extends StatelessWidget {
-  const _VersionBadge({
-    required this.label,
-    required this.color,
-    required this.bgColor,
-  });
-
-  final String label;
-  final Color color;
-  final Color bgColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    );
-  }
-}

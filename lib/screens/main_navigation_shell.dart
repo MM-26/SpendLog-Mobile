@@ -6,6 +6,8 @@ import 'home/home_screen.dart';
 import 'settings/settings_screen.dart';
 
 /// Main navigation shell hosting BottomNavigationBar and FloatingActionButton.
+/// Supports both bottom navigation taps and horizontal swipe transitions between tabs
+/// (v1.1 Decision 10, step 2).
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
 
@@ -15,12 +17,46 @@ class MainNavigationShell extends StatefulWidget {
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
+  late final PageController _pageController;
 
   final List<Widget> _screens = const [
-    HomeScreen(),
-    HistoryScreen(),
-    SettingsScreen(),
+    _KeepAlivePage(child: HomeScreen()),
+    _KeepAlivePage(child: HistoryScreen()),
+    _KeepAlivePage(child: SettingsScreen()),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onTabTapped(int index) {
+    if (_currentIndex == index) return;
+    final isAdjacent = (_currentIndex - index).abs() == 1;
+    setState(() => _currentIndex = index);
+    if (isAdjacent) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 130),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      // Instant jump for non-adjacent screens (e.g. Home <-> Settings)
+      // to avoid awkward scrolling through intermediate tabs.
+      _pageController.jumpToPage(index);
+    }
+  }
+
+  void _onPageChanged(int index) {
+    setState(() => _currentIndex = index);
+  }
 
   void _openAddExpense() {
     Navigator.of(context).push(
@@ -39,11 +75,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final navBorder = isDark ? const Color(0xFF2E3147) : const Color(0xFFE5E7EB);
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: _onPageChanged,
         children: _screens,
       ),
-      // FAB is visible ONLY on Home tab
+      // FAB is visible ONLY on Home tab (v1.1 Decision 10, step 2)
       floatingActionButton: _currentIndex == 0
           ? FloatingActionButton(
               onPressed: _openAddExpense,
@@ -88,7 +125,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: _onTabTapped,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_outlined),
@@ -109,5 +146,26 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ),
       ),
     );
+  }
+}
+
+/// Helper wrapper preserving page state across tab swipes.
+class _KeepAlivePage extends StatefulWidget {
+  final Widget child;
+  const _KeepAlivePage({required this.child});
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

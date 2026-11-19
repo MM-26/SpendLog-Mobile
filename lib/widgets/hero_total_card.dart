@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/currency_formatter.dart';
 
-/// Signature gradient banner card for displaying monthly totals.
+/// Signature gradient banner card for displaying monthly totals (with 3-in-1 breakdown support).
 class HeroTotalCard extends StatelessWidget {
   final String title;
   final double amount;
+  final double? incomeAmount;
+  final double? spentAmount;
   final String? subtitle;
   final IconData? icon;
 
@@ -13,12 +15,16 @@ class HeroTotalCard extends StatelessWidget {
     super.key,
     required this.title,
     required this.amount,
+    this.incomeAmount,
+    this.spentAmount,
     this.subtitle,
     this.icon = Icons.account_balance_wallet_rounded,
   });
 
   @override
   Widget build(BuildContext context) {
+    final showBreakdown = incomeAmount != null || spentAmount != null;
+
     return Container(
       width: double.infinity,
       clipBehavior: Clip.hardEdge,
@@ -63,7 +69,7 @@ class HeroTotalCard extends StatelessWidget {
 
           // Content
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -94,9 +100,11 @@ class HeroTotalCard extends StatelessWidget {
                       ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(
-                  CurrencyFormatter.format(amount),
+                  (showBreakdown && amount > 0 && (incomeAmount ?? 0) > 0)
+                      ? '+${CurrencyFormatter.format(amount)}'
+                      : CurrencyFormatter.format(amount),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 32,
@@ -105,7 +113,7 @@ class HeroTotalCard extends StatelessWidget {
                   ),
                 ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       Container(
@@ -126,6 +134,130 @@ class HeroTotalCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                ],
+
+                // 3-in-1 Split Breakdown Row (Income vs Spent)
+                if (showBreakdown) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Income Column
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1E8E3E).withValues(alpha: 0.28),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_downward_rounded,
+                                  color: Color(0xFF34D399),
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'INCOME',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.6,
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '+${CurrencyFormatter.format(incomeAmount ?? 0.0)}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF34D399),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Divider
+                        Container(
+                          height: 26,
+                          width: 1,
+                          color: Colors.white.withValues(alpha: 0.16),
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+
+                        // Spent Column
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_upward_rounded,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'SPENT',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.6,
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      CurrencyFormatter.format(spentAmount ?? 0.0),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],

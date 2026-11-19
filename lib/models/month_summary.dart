@@ -9,16 +9,28 @@ class MonthSummary {
   final int year;
   final int month;
 
-  /// Sum of [ExpenseModel.amount] for all expenses in this month.
+  /// Sum of expenses (debits) in this month (maintained for backwards compatibility).
   final double total;
 
-  /// All expenses for this month, ordered by [ExpenseModel.expenseDate] descending.
+  /// Sum of credits (income) in this month.
+  final double totalIncome;
+
+  /// Sum of debits (expenses) in this month.
+  final double totalExpense;
+
+  /// Net balance (totalIncome - totalExpense).
+  final double netBalance;
+
+  /// All entries for this month, ordered by [ExpenseModel.expenseDate] descending.
   final List<ExpenseModel> expenses;
 
   const MonthSummary({
     required this.year,
     required this.month,
     required this.total,
+    this.totalIncome = 0.0,
+    this.totalExpense = 0.0,
+    this.netBalance = 0.0,
     required this.expenses,
   });
 }

@@ -5,6 +5,7 @@ class ExpenseModel {
   final String category;
   final DateTime expenseDate;
   final String? notes;
+  final String type; // 'expense' or 'income' (Bible v1.16 Decision 10)
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -15,9 +16,13 @@ class ExpenseModel {
     required this.category,
     required this.expenseDate,
     this.notes,
+    this.type = 'expense',
     required this.createdAt,
     required this.updatedAt,
   });
+
+  bool get isIncome => type == 'income';
+  bool get isExpense => type == 'expense';
 
   ExpenseModel copyWith({
     int? id,
@@ -26,6 +31,7 @@ class ExpenseModel {
     String? category,
     DateTime? expenseDate,
     String? notes,
+    String? type,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -36,6 +42,7 @@ class ExpenseModel {
       category: category ?? this.category,
       expenseDate: expenseDate ?? this.expenseDate,
       notes: notes ?? this.notes,
+      type: type ?? this.type,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

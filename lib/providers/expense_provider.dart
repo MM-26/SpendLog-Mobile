@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/database/app_database.dart';
+import '../core/utils/backup_service.dart';
 import '../data_sources/local/expense_local_data_source.dart';
 import '../models/expense.dart';
 import '../models/month_summary.dart';
@@ -47,10 +48,27 @@ final currentMonthExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) {
   return ref.watch(expenseRepositoryProvider).getExpensesForMonth(now.year, now.month);
 });
 
-/// Total amount spent in the current calendar month.
+/// Total amount spent in the current calendar month (expenses only).
 final currentMonthTotalProvider = FutureProvider<double>((ref) async {
   final expenses = await ref.watch(currentMonthExpensesProvider.future);
-  return expenses.fold<double>(0.0, (sum, item) => sum + item.amount);
+  return expenses
+      .where((e) => e.isExpense)
+      .fold<double>(0.0, (sum, item) => sum + item.amount);
+});
+
+/// Total income (credits) received in the current calendar month.
+final currentMonthIncomeTotalProvider = FutureProvider<double>((ref) async {
+  final expenses = await ref.watch(currentMonthExpensesProvider.future);
+  return expenses
+      .where((e) => e.isIncome)
+      .fold<double>(0.0, (sum, item) => sum + item.amount);
+});
+
+/// Net balance for the current calendar month (Income - Expenses).
+final currentMonthNetBalanceProvider = FutureProvider<double>((ref) async {
+  final income = await ref.watch(currentMonthIncomeTotalProvider.future);
+  final spent = await ref.watch(currentMonthTotalProvider.future);
+  return income - spent;
 });
 
 /// Expenses for a specific [year] and [month] (used by MonthDetailScreen).
@@ -84,6 +102,7 @@ class ExpenseActions {
     required String category,
     required DateTime expenseDate,
     String? notes,
+    String type = 'expense',
   }) async {
     await _repository.addExpense(
       description: description,
@@ -91,6 +110,7 @@ class ExpenseActions {
       category: category,
       expenseDate: expenseDate,
       notes: notes,
+      type: type,
     );
     _invalidateAll();
   }
@@ -105,11 +125,30 @@ class ExpenseActions {
     _invalidateAll();
   }
 
+  /// Prompts user with "Save As" file picker and exports backup (Bible v1.16 Decision 10).
+  Future<BackupExportResult?> exportBackup() async {
+    final expenses = await _repository.getAllExpenses();
+    return BackupService.exportWithFilePicker(expenses: expenses);
+  }
+
+  /// Prompts user with file picker and strictly validates the selected backup (Bible v1.16 Decision 10).
+  Future<BackupValidationResult?> pickAndValidateBackup() {
+    return BackupService.pickAndValidateBackup();
+  }
+
+  /// Atomically replaces all expenses with [newExpenses] and refreshes all providers (Bible §3 Decision 10).
+  Future<void> restoreBackup(List<ExpenseModel> newExpenses) async {
+    await _repository.replaceAllExpenses(newExpenses);
+    _invalidateAll();
+  }
+
   void _invalidateAll() {
     _ref.invalidate(expensesProvider);
     _ref.invalidate(monthlyHistoryProvider);
     _ref.invalidate(currentMonthExpensesProvider);
     _ref.invalidate(currentMonthTotalProvider);
+    _ref.invalidate(currentMonthIncomeTotalProvider);
+    _ref.invalidate(currentMonthNetBalanceProvider);
     _ref.invalidate(monthExpensesProvider);
     _ref.invalidate(monthTotalProvider);
   }

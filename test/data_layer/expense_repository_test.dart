@@ -185,15 +185,17 @@ void main() {
           expenseDate: DateTime(2026, 7, 5));
 
       final history = await repo.getMonthlyHistory();
-      expect(history, hasLength(2));
+      // Continuous monthly history includes from oldest expense up to current month
+      expect(history.first.year, DateTime.now().year);
+      expect(history.first.month, DateTime.now().month);
+      expect(history.last.year, 2026);
+      expect(history.last.month, 7);
 
-      expect(history[0].year, 2026);
-      expect(history[0].month, 8);
-      expect(history[0].total, closeTo(35.0, 0.001));
+      final aug = history.firstWhere((m) => m.year == 2026 && m.month == 8);
+      expect(aug.total, closeTo(35.0, 0.001));
 
-      expect(history[1].year, 2026);
-      expect(history[1].month, 7);
-      expect(history[1].total, closeTo(100.0, 0.001));
+      final jul = history.firstWhere((m) => m.year == 2026 && m.month == 7);
+      expect(jul.total, closeTo(100.0, 0.001));
     });
 
     test('getMonthlyHistory returns empty list when no expenses', () async {

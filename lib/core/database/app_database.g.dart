@@ -72,6 +72,16 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('expense'),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -104,6 +114,7 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     category,
     expenseDate,
     notes,
+    type,
     createdAt,
     updatedAt,
   ];
@@ -166,6 +177,12 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -211,6 +228,10 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -235,6 +256,7 @@ class Expense extends DataClass implements Insertable<Expense> {
   final String category;
   final DateTime expenseDate;
   final String? notes;
+  final String type;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Expense({
@@ -244,6 +266,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     required this.category,
     required this.expenseDate,
     this.notes,
+    required this.type,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -258,6 +281,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
+    map['type'] = Variable<String>(type);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -273,6 +297,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      type: Value(type),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -290,6 +315,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       category: serializer.fromJson<String>(json['category']),
       expenseDate: serializer.fromJson<DateTime>(json['expenseDate']),
       notes: serializer.fromJson<String?>(json['notes']),
+      type: serializer.fromJson<String>(json['type']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -304,6 +330,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       'category': serializer.toJson<String>(category),
       'expenseDate': serializer.toJson<DateTime>(expenseDate),
       'notes': serializer.toJson<String?>(notes),
+      'type': serializer.toJson<String>(type),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -316,6 +343,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     String? category,
     DateTime? expenseDate,
     Value<String?> notes = const Value.absent(),
+    String? type,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Expense(
@@ -325,6 +353,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     category: category ?? this.category,
     expenseDate: expenseDate ?? this.expenseDate,
     notes: notes.present ? notes.value : this.notes,
+    type: type ?? this.type,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -340,6 +369,7 @@ class Expense extends DataClass implements Insertable<Expense> {
           ? data.expenseDate.value
           : this.expenseDate,
       notes: data.notes.present ? data.notes.value : this.notes,
+      type: data.type.present ? data.type.value : this.type,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -354,6 +384,7 @@ class Expense extends DataClass implements Insertable<Expense> {
           ..write('category: $category, ')
           ..write('expenseDate: $expenseDate, ')
           ..write('notes: $notes, ')
+          ..write('type: $type, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -368,6 +399,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     category,
     expenseDate,
     notes,
+    type,
     createdAt,
     updatedAt,
   );
@@ -381,6 +413,7 @@ class Expense extends DataClass implements Insertable<Expense> {
           other.category == this.category &&
           other.expenseDate == this.expenseDate &&
           other.notes == this.notes &&
+          other.type == this.type &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -392,6 +425,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   final Value<String> category;
   final Value<DateTime> expenseDate;
   final Value<String?> notes;
+  final Value<String> type;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const ExpensesCompanion({
@@ -401,6 +435,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.category = const Value.absent(),
     this.expenseDate = const Value.absent(),
     this.notes = const Value.absent(),
+    this.type = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -411,6 +446,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     required String category,
     required DateTime expenseDate,
     this.notes = const Value.absent(),
+    this.type = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   }) : description = Value(description),
@@ -424,6 +460,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Expression<String>? category,
     Expression<DateTime>? expenseDate,
     Expression<String>? notes,
+    Expression<String>? type,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -434,6 +471,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       if (category != null) 'category': category,
       if (expenseDate != null) 'expense_date': expenseDate,
       if (notes != null) 'notes': notes,
+      if (type != null) 'type': type,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -446,6 +484,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Value<String>? category,
     Value<DateTime>? expenseDate,
     Value<String?>? notes,
+    Value<String>? type,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -456,6 +495,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       category: category ?? this.category,
       expenseDate: expenseDate ?? this.expenseDate,
       notes: notes ?? this.notes,
+      type: type ?? this.type,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -482,6 +522,9 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -500,6 +543,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
           ..write('category: $category, ')
           ..write('expenseDate: $expenseDate, ')
           ..write('notes: $notes, ')
+          ..write('type: $type, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -533,6 +577,7 @@ typedef $$ExpensesTableCreateCompanionBuilder =
       required String category,
       required DateTime expenseDate,
       Value<String?> notes,
+      Value<String> type,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -544,6 +589,7 @@ typedef $$ExpensesTableUpdateCompanionBuilder =
       Value<String> category,
       Value<DateTime> expenseDate,
       Value<String?> notes,
+      Value<String> type,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -584,6 +630,11 @@ class $$ExpensesTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -637,6 +688,11 @@ class $$ExpensesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -679,6 +735,9 @@ class $$ExpensesTableAnnotationComposer
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
 
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -720,6 +779,7 @@ class $$ExpensesTableTableManager
                 Value<String> category = const Value.absent(),
                 Value<DateTime> expenseDate = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<String> type = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => ExpensesCompanion(
@@ -729,6 +789,7 @@ class $$ExpensesTableTableManager
                 category: category,
                 expenseDate: expenseDate,
                 notes: notes,
+                type: type,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -740,6 +801,7 @@ class $$ExpensesTableTableManager
                 required String category,
                 required DateTime expenseDate,
                 Value<String?> notes = const Value.absent(),
+                Value<String> type = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => ExpensesCompanion.insert(
@@ -749,6 +811,7 @@ class $$ExpensesTableTableManager
                 category: category,
                 expenseDate: expenseDate,
                 notes: notes,
+                type: type,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),

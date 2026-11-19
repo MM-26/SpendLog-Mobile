@@ -17,6 +17,9 @@ class Expenses extends Table {
 
   TextColumn get notes => text().nullable()();
 
+  // Credit / Income type: 'expense' (debit) or 'income' (credit) (Bible v1.16 Decision 10)
+  TextColumn get type => text().withDefault(const Constant('expense'))();
+
   // Audit field — set at write time only, never shown in UI, never editable
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();

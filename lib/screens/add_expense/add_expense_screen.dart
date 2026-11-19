@@ -11,7 +11,8 @@ import '../../providers/expense_provider.dart';
 /// Adapts behavior based on entry context:
 /// - [isFromMonthDetail] = false (From Home): Date bounded between 1st of current month and today.
 /// - [isFromMonthDetail] = true (From Month Detail): Date bounded entirely within [initialMonthYear].
-/// - [isEditing] = true: Pre-populates fields for modifying an existing expense.
+/// - [isEditing] = true: Pre-populates fields. A Delete icon is shown in the AppBar
+///   (v1.1 Decision 10, step 1). [onDeletePressed] is called when the user confirms deletion.
 class AddExpenseScreen extends ConsumerStatefulWidget {
   final bool isFromMonthDetail;
   final DateTime? initialMonthYear;
@@ -22,7 +23,11 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
   final String? initialCategory;
   final DateTime? initialDate;
   final String? initialNotes;
+  final String? initialType;
   final DateTime? initialCreatedAt;
+  /// Called after the user confirms deletion in edit mode. The caller is
+  /// responsible for executing the delete operation and popping the screen.
+  final Future<void> Function()? onDeletePressed;
 
   const AddExpenseScreen({
     super.key,
@@ -35,7 +40,9 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
     this.initialCategory,
     this.initialDate,
     this.initialNotes,
+    this.initialType,
     this.initialCreatedAt,
+    this.onDeletePressed,
   });
 
   @override
@@ -49,10 +56,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   late final TextEditingController _notesController;
 
   late String _selectedCategory;
+  late String _selectedType;
   late DateTime _selectedDate;
   bool _isSaving = false;
 
-  final List<String> _categories = [
+  final List<String> _expenseCategories = [
     'Food',
     'Transport',
     'Shopping',
@@ -62,10 +70,31 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     'Other',
   ];
 
+  final List<String> _incomeCategories = [
+    'Salary',
+    'Allowance',
+    'Other',
+  ];
+
+  List<String> get _currentCategories =>
+      _selectedType == 'income' ? _incomeCategories : _expenseCategories;
+
+  void _switchType(String newType) {
+    if (_selectedType == newType) return;
+    setState(() {
+      _selectedType = newType;
+      if (!_currentCategories.contains(_selectedCategory)) {
+        _selectedCategory = newType == 'income' ? 'Salary' : 'Food';
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
+
+    _selectedType = widget.initialType ?? 'expense';
 
     _descriptionController = TextEditingController(
       text: widget.initialDescription ?? '',
@@ -81,7 +110,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       text: widget.initialNotes ?? '',
     );
 
-    _selectedCategory = widget.initialCategory ?? 'Food';
+    _selectedCategory = widget.initialCategory ??
+        (_selectedType == 'income' ? 'Salary' : 'Food');
 
     if (widget.initialDate != null) {
       _selectedDate = widget.initialDate!;
@@ -163,6 +193,75 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
   }
 
+  /// Shows a confirmation dialog then calls [onDeletePressed] (v1.1 Decision 10, step 1).
+  /// Hidden in Add mode — shown only when [widget.isEditing] is true.
+  Future<void> _handleDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/icons/delete_icon.png',
+              width: 24,
+              height: 24,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 8),
+            const Text('Delete Expense'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete '
+          '"${_descriptionController.text.trim().isEmpty ? 'this expense' : _descriptionController.text.trim()}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await widget.onDeletePressed!();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Deleted "${_descriptionController.text.trim().isEmpty ? 'expense' : _descriptionController.text.trim()}"',
+            ),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting expense: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _handleSave() async {
     if (_isSaving) return;
     if (_formKey.currentState?.validate() ?? false) {
@@ -180,6 +279,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             category: _selectedCategory,
             expenseDate: _selectedDate,
             notes: notes,
+            type: _selectedType,
             createdAt: widget.initialCreatedAt ?? DateTime.now(),
             updatedAt: DateTime.now(),
           );
@@ -187,8 +287,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Expense "$description" updated'),
-                backgroundColor: AppColors.primary,
+                content: Text(
+                  '${_selectedType == 'income' ? "Income" : "Expense"} "$description" updated',
+                ),
+                backgroundColor: _selectedType == 'income' ? AppColors.creditGreen : AppColors.primary,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -201,12 +303,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             category: _selectedCategory,
             expenseDate: _selectedDate,
             notes: notes,
+            type: _selectedType,
           );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Expense "$description" logged'),
-                backgroundColor: AppColors.primary,
+                content: Text(
+                  '${_selectedType == 'income' ? "Income" : "Expense"} "$description" logged',
+                ),
+                backgroundColor: _selectedType == 'income' ? AppColors.creditGreen : AppColors.primary,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -241,19 +346,37 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final textSecondary = isDark ? const Color(0xFF9AA5C4) : const Color(0xFF6B7280);
     final textMuted = isDark ? const Color(0xFF5C6685) : const Color(0xFF9CA3AF);
 
+    final typeLabel = _selectedType == 'income' ? 'Income' : 'Expense';
     final title = widget.isEditing
-        ? 'Edit Expense'
+        ? 'Edit $typeLabel'
         : (widget.isFromMonthDetail
             ? 'Add to ${DateFormatter.formatMonthYear(widget.initialMonthYear!)}'
-            : 'Add Expense');
+            : 'Add $typeLabel');
 
-    final buttonText = widget.isEditing ? 'Update Expense' : 'Save Expense';
+    final buttonText = widget.isEditing ? 'Update $typeLabel' : 'Save $typeLabel';
 
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: bgColor,
         title: Text(title),
+        actions: [
+          // Delete icon — edit mode only (v1.1 Decision 10, step 1).
+          if (widget.isEditing && widget.onDeletePressed != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                icon: Image.asset(
+                  'assets/icons/delete_icon.png',
+                  width: 24,
+                  height: 24,
+                  fit: BoxFit.contain,
+                ),
+                tooltip: 'Delete expense',
+                onPressed: _handleDelete,
+              ),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -262,6 +385,76 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Type Toggle (Expense vs Income) ───────────────────────
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _switchType('expense'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: _selectedType == 'expense'
+                                ? AppColors.primary
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Expense',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _selectedType == 'expense'
+                                  ? Colors.white
+                                  : textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _switchType('income'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: _selectedType == 'income'
+                                ? AppColors.creditGreen
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Income',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _selectedType == 'income'
+                                  ? Colors.white
+                                  : textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               // ── Amount Input Card ─────────────────────────────────────
               FormField<String>(
                 initialValue: _amountController.text,
@@ -320,11 +513,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Text(
-                                  '₹',
+                                  _selectedType == 'income' ? '+ ₹' : '₹',
                                   style: TextStyle(
                                     fontSize: 34,
                                     fontWeight: FontWeight.w800,
-                                    color: hasError ? AppColors.error : AppColors.primary,
+                                    color: hasError
+                                        ? AppColors.error
+                                        : (_selectedType == 'income'
+                                            ? AppColors.creditGreen
+                                            : AppColors.primary),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -398,7 +595,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 style: TextStyle(color: textPrimary),
                 maxLength: 100,
                 decoration: InputDecoration(
-                  hintText: 'e.g. Grocery Shopping, Fuel, Dinner',
+                  hintText: _selectedType == 'income'
+                      ? 'e.g. November Salary, Allowance'
+                      : 'e.g. Grocery Shopping, Fuel, Dinner',
                   prefixIcon: Icon(Icons.edit_note_rounded, color: textSecondary),
                   filled: true,
                   fillColor: surfaceColor,
@@ -446,7 +645,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               Wrap(
                 spacing: 8,
                 runSpacing: 10,
-                children: _categories.map((category) {
+                children: _currentCategories.map((category) {
                   final isSelected = _selectedCategory == category;
                   final style = AppColors.getCategoryStyle(category);
 
@@ -499,7 +698,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
               // ── Date Picker Field ─────────────────────────────────────
               Text(
-                'Expense Date',
+                '${_selectedType == 'income' ? "Income" : "Expense"} Date',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -597,11 +796,18 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
+                  gradient: _selectedType == 'income'
+                      ? const LinearGradient(
+                          colors: [Color(0xFF1E8E3E), Color(0xFF137333)],
+                        )
+                      : AppColors.primaryGradient,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.35),
+                      color: (_selectedType == 'income'
+                              ? AppColors.creditGreen
+                              : AppColors.primary)
+                          .withValues(alpha: 0.35),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),

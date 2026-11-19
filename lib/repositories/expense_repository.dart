@@ -34,8 +34,9 @@ class ExpenseRepository {
     return _dataSource.getExpensesForMonth(year, month);
   }
 
-  /// Returns a list of [MonthSummary] objects, one per month that has at
-  /// least one expense, sorted newest-first.
+  /// Returns every month from the oldest expense up to the current month,
+  /// sorted newest-first. Months with zero expenses are included so the
+  /// user can navigate into them and log retroactive entries via History.
   Future<List<MonthSummary>> getMonthlyHistory() {
     return _dataSource.getExpensesGroupedByMonth();
   }
@@ -55,6 +56,7 @@ class ExpenseRepository {
     required String category,
     required DateTime expenseDate,
     String? notes,
+    String type = 'expense',
   }) {
     if (description.trim().isEmpty) {
       throw ArgumentError('Description must not be empty.');
@@ -73,6 +75,7 @@ class ExpenseRepository {
       category: category,
       expenseDate: expenseDate,
       notes: notes?.trim().isEmpty == true ? null : notes?.trim(),
+      type: type,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -98,5 +101,10 @@ class ExpenseRepository {
   /// Deletes the expense with the given [id].
   Future<void> deleteExpense(int id) {
     return _dataSource.deleteExpense(id);
+  }
+
+  /// Atomically replaces all expenses with [newExpenses] (Bible v1.1 Decision 10).
+  Future<void> replaceAllExpenses(List<ExpenseModel> newExpenses) {
+    return _dataSource.replaceAllExpenses(newExpenses);
   }
 }
